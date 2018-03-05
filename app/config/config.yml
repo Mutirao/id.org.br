@@ -38,6 +38,9 @@ twig:
         app_router: "@router"
         postalcode_search_link: 
         third_party_login: %third_party_login%
+        password_hint: "@password_hint"
+        intl_tel_input_preferred_countries: ["br"]
+        google_analytics_trackingId: "%google_analytics_trackingId%"
 
 # Assetic Configuration
 assetic:
@@ -77,6 +80,10 @@ assetic:
             inputs:
                 - 'assets/vendor/bootstrap/dist/css/bootstrap.min.css'
                 - '@LoginCidadaoCoreBundle/Resources/public/bootstrap-switch/3.0.2/css/bootstrap3/bootstrap-switch.min.css'
+        badges_css:
+            inputs:
+                - '@LoginCidadaoBadgesBundle/Resources/public/css/badges.css'
+                - '@LoginCidadaoPhoneVerificationBundle/Resources/public/css/badges.css'
         intl_tel_input_css:
             inputs:
                 - 'bundles/logincidadaocore/intl-tel-input/css/intlTelInput.css'
@@ -117,6 +124,7 @@ assetic:
         lc_logged_css:
             inputs:
                 - '@lc_base_css'
+                - '@badges_css'
                 - 'bundles/logincidadaocore/css/logged/logged.css'
 
     filters:
@@ -133,13 +141,25 @@ assetic:
 # Doctrine Configuration
 doctrine:
     dbal:
-        driver:   %database_driver%
-        host:     %database_host%
-        port:     %database_port%
-        dbname:   %database_name%
-        user:     %database_user%
-        password: %database_password%
-        charset:  UTF8
+        default_connection: default
+        connections:
+            default:
+                driver:   %database_driver%
+                host:     %database_host%
+                port:     %database_port%
+                dbname:   %database_name%
+                user:     %database_user%
+                password: %database_password%
+                charset:  UTF8
+            logs:
+                logging:  false
+                driver:   %database_driver%
+                host:     %database_host%
+                port:     %database_port%
+                dbname:   %database_name%
+                user:     %database_user%
+                password: %database_password%
+                charset:  UTF8
         # if using pdo_sqlite as your database driver, add the path in parameters.yml
         # e.g. database_path: %kernel.root_dir%/data/data.db3
         # path:     %database_path%
@@ -147,23 +167,32 @@ doctrine:
             phone_number: Misd\PhoneNumberBundle\Doctrine\DBAL\Types\PhoneNumberType
 
     orm:
+        default_entity_manager: default
+        entity_managers:
+            default:
+                connection: default
+                auto_mapping: true
+                dql:
+                    string_functions:
+                      right: LoginCidadao\CoreBundle\DQL\Right
+                      countif: LoginCidadao\CoreBundle\DQL\CountIf
+                      lowerunaccent: LoginCidadao\CoreBundle\DQL\LowerUnaccent
+
+                    datetime_functions:
+                          date:       Oro\ORM\Query\AST\Functions\SimpleFunction
+
+                    numeric_functions:
+                        dayofweek:    Oro\ORM\Query\AST\Functions\SimpleFunction
+            logs:
+                connection: logs
+                mappings:
+                    LoginCidadaoLogBundle: ~
+
         auto_generate_proxy_classes: %kernel.debug%
-        auto_mapping: true
         resolve_target_entities:
             LoginCidadao\CoreBundle\Model\PersonInterface: %user.class%
             LoginCidadao\OAuthBundle\Model\OrganizationInterface: %organization.class%
             LoginCidadao\OAuthBundle\Model\ClientInterface: %oauth_client.class%
-        dql:
-          string_functions:
-            right: LoginCidadao\CoreBundle\DQL\Right
-            countif: LoginCidadao\CoreBundle\DQL\CountIf
-            lowerunaccent: LoginCidadao\CoreBundle\DQL\LowerUnaccent
-
-          datetime_functions:
-                date:       Oro\ORM\Query\AST\Functions\SimpleFunction
-
-          numeric_functions:
-              dayofweek:    Oro\ORM\Query\AST\Functions\SimpleFunction
 # Swiftmailer Configuration
 swiftmailer:
     transport: %mailer_transport%
@@ -218,6 +247,10 @@ fos_user:
         form:
             type: LoginCidadao\CoreBundle\Form\Type\ChangePasswordFormType
 
+    from_email:
+        address: %mailer_sender_mail%
+        sender_name: %mailer_sender_name%
+
 # Audit Trail
 simple_things_entity_audit:
     global_ignore_columns:
@@ -233,6 +266,7 @@ simple_things_entity_audit:
         - LoginCidadao\CoreBundle\Entity\Country
         - LoginCidadao\CoreBundle\Entity\IdCard
         - LoginCidadao\CoreBundle\Entity\ImpersonationReport
+        - LoginCidadao\CoreBundle\Entity\InvalidateSessionRequest
         - LoginCidadao\CoreBundle\Entity\Person
         - LoginCidadao\CoreBundle\Entity\PersonAddress
         - LoginCidadao\CoreBundle\Entity\SentEmail
@@ -243,12 +277,17 @@ simple_things_entity_audit:
         - LoginCidadao\OAuthBundle\Entity\Client
         - LoginCidadao\OAuthBundle\Entity\RefreshToken
         - LoginCidadao\OAuthBundle\Entity\Organization
+        - LoginCidadao\OpenIDBundle\Entity\ClientMetadata
+
+        - LoginCidadao\PhoneVerificationBundle\Entity\PhoneVerification
+        - LoginCidadao\PhoneVerificationBundle\Entity\SentVerification
 
 hwi_oauth:
     connect:
         confirmation: false
         account_connector: lc.hwi_twitter.user_provider
     firewall_name: main
+    failed_auth_path: fos_user_profile_edit
     fosub:
         username_iterations: 30
         properties:
@@ -278,7 +317,7 @@ parameters:
     user.class: LoginCidadao\CoreBundle\Entity\Person
     buzz.client.class: Donato\Generic\HWIOAuthProxyBundle\Buzz\Client\CurlProxy
     hwi_oauth.resource_owner.twitter.class: LoginCidadao\CoreBundle\OAuth\ResourceOwner\TwitterResourceOwner
-    lc_public_scopes_oidc: 'openid sub name given_name family_name full_name preferred_username picture email email_verified birthdate phone_number address updated_at'
+    lc_public_scopes_oidc: 'openid offline_access sub name given_name family_name full_name preferred_username picture email email_verified birthdate phone_number address updated_at'
     lc_public_scopes_oauth2: 'public_profile username first_name last_name full_name cpf city public_profile country state addresses id_cards mobile logout'
     lc_public_scopes: %lc_public_scopes_oidc% %lc_public_scopes_oauth2%
     lc_reserved_scopes: 'voter_registration'
@@ -366,7 +405,7 @@ fos_rest:
     disable_csrf_role: ROLE_API
 
 nelmio_api_doc:
-    name: MeuRS API
+    name: Login Cidadão API
 
 jms_serializer:
     metadata:
@@ -519,3 +558,23 @@ donato_path_well:
 
 login_cidadao_tos:
     use_tasks: true
+
+login_cidadao_phone_verification:
+    enabled: true
+    verification_code:
+        length: 6
+
+monolog:
+    handlers:
+        db:
+            type: service
+            id: lc.monolog.db.handler
+            level: info
+
+login_cidadao_api:
+    versions:
+        1:
+            0: [0, 1, 2, 3]
+            1: [0]
+        2:
+            0: [0]

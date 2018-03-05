@@ -1,4 +1,12 @@
 <?php
+/**
+ * This file is part of the login-cidadao project or it's bundles.
+ *
+ * (c) Guilherme Donato <guilhermednt on github>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
 namespace LoginCidadao\OpenIDBundle\Controller;
 
@@ -22,7 +30,7 @@ class WellKnownController extends FOSRestController
             UrlGeneratorInterface::ABSOLUTE_URL);
         $tokenEndpoint  = $this->generateUrl('_token', array(),
             UrlGeneratorInterface::ABSOLUTE_URL);
-        $personEndpoint = $this->generateUrl('get_person',
+        $personEndpoint = $this->generateUrl('api_get_person',
             array('_format' => 'json'), UrlGeneratorInterface::ABSOLUTE_URL);
 
         $registrationEndpoint = $this->generateUrl('oidc_dynamic_registration',

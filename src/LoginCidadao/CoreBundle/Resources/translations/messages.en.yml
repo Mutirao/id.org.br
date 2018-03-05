@@ -52,16 +52,12 @@ Save: Save
 'Privacy Policy': 'Privacy Policy'
 'GitHub Repository': 'GitHub Repository'
 Contact: Contact
-'About the Government': 'About the Government'
-Government: Government
 Profile: Profile
 Services: Services
 'Change Username': 'Change Username'
 'Change password': 'Change Password'
 Activate: Activate
 Deactivate: Deactivate
-cpf_reminder.subject: 'We noticed that your account doesn''t have a CPF associated with it yet.'
-cpf_reminder.message: "Hello, %name%\n\nWe noticed that your account doesn''t have a CPF associated with it yet.\n\nPlease consider visiting Citizen''s Login until %date% to complete this information. After that date, your account might be suspended.\n"
 'Toggle Navigation': 'Toggle Navigation'
 'Log in': 'Log in'
 Applications: Applications
@@ -79,22 +75,13 @@ exception.alreadyLinkedAccount: 'This account is already linked with another use
 cpf.registration.title: 'Registro de CPF'
 'Your login': 'Your login'
 '<a href="%link%">Background picture</a> by %name%': '<a href="%link%">Background picture</a> by %name%'
-'Active Services': 'Active Services'
-'Other Services': 'Other Services'
 notification.unconfirmed.email.title: 'Unconfirmed Email!'
 notification.unconfirmed.email.shortText: 'If you don''t confirm you email in due time your account will be erased. Follow instructions sent to your email.'
 notification.unconfirmed.email.text: "<p>To use this system you must use a valid email address.</p> <p>If you don't confirm you email clicking on the link sent to your email address your account will be removed.</p>\n"
-notification.empty.password.title: 'You don''t have a password!'
-notification.empty.password.shortText: 'Click here to define your password.'
-notification.empty.password.text: ''
 'This service is already active in your Citizen''s Login account': 'This service is already active in your Citizen''s Login account'
-'Deactivate this service': 'Deactivate this service'
-'This service is not active in your Citizen''s Login account': 'This service is not active in your Citizen''s Login account'
-'Activate this service': 'Activate this service'
 social-networks.unlink.no-password: 'You must define a password before unlinking any social network.'
 social-networks.unlink.facebook.success: 'Facebook successfully unlinked.'
 social-networks.unlink.twitter.success: 'Twitter successfully unlinked.'
-'Mark as read': 'Mark as read'
 'New Service': 'New Service'
 Name: Name
 Description: Description
@@ -116,19 +103,14 @@ Secret : Private Key (Secret)
 'Secret/Private Key': 'Secret/Private Key'
 'Public Id': 'Public Id'
 Active: Active
-'There are no active services yet.': 'There are no active services yet.'
 Inactive: Inactive
 'Suggest a Service': 'Suggest a Service'
 Suggestion: Suggestion
 Send: Send
 'Your last suggested Services': 'Your last suggested Services'
 'Login Cidadão': 'Citizen Login'
-'Do you really want to disable this service?': 'Do you really want to disable this service?'
 Yes: Yes
 No: No
-'This service uses the following data from your Login Citizen account': 'This service uses the following data from your Login Citizen account'
-'This service is not available yet. Stay tuned for the launch date.': 'This service is not available yet. Stay tuned for the launch date.'
-
 'With only one account, the citizen will be able to use government''s digital services.': 'With only one account, the citizen will be able to use government''s digital services.'
 'One account. The entire Government.': 'One account. The entire Government.'
 'Creative commons': Creative commons
@@ -215,7 +197,6 @@ FEATURE_2FACTOR_AUTH: Two Factor Authentication Feature
 birthdate.format: 'm/d/Y'
 Activity Log: Activity Log
 Badges: Badges
-You don't have any activity log.: You don't have any activity log.
 'Select a state below:': 'Select a state below:'
 Firstname: First name
 Surname: Surname
@@ -319,6 +300,11 @@ access_log:
     page.title: Access Log
 activity_log:
     page.title: Services Activity Log
+    page.title: 'Registros de Atividade de Serviços'
+    admin.name: 'Tech support'
+    viewed_info: 'Information viewed at %date%'
+    changed_info: 'Information changed at %date%'
+
 log.date.format: 'm/d/Y H:i:s'
 admin:
     title: Admin Area
@@ -356,6 +342,21 @@ admin:
     person:
         list: 'Manage People'
         list.title:  'Search People'
+        profile_views_status:
+            menu: 'Person Management Auditing'
+            title: 'Person Management Auditing'
+            summary:
+                caption: 'Amount of profiles viewed by each administrator'
+                actor: 'Administrator'
+                count: 'Profiles viewed'
+                details.title: 'Show details'
+            details:
+                caption: 'Profiles viewed by %name%'
+                person: 'Person'
+                username: 'Username'
+                date: 'Date'
+                date_format: 'm/d/Y H:i:s'
+                user_deleted: 'Account Removed'
 force_password_change:
     title: Update your password to continue
     description: Please update your password to improve your account's security.
@@ -436,31 +437,10 @@ error.generic:
 error.404:
     title: Page not found
     body: The requested page couldn't be located. Checkout for any URL misspelling.
-dynamic_form:
-    title: Complete your information
-    body: <strong>%client%</strong> needs some additional details about you. Please complete the missing information below to continue.
-    submit:
-        label: 'After completing your information, click the following button to continue:'
-        button: Save
-    skip:
-        open_warning: Skip this step
-        warning: If you chose to skip this step now, it is possible that the service you are trying to access will ask you again for this information or will deny your access. Also, we'll keep suggesting this step on each new access.
-        confirm: Skip anyway
-    email_verification:
-        body: <strong>%client%</strong> requires that you have a validated email in order to proceed.
-        how_to: Validating your email address is pretty simple and fast. You just have to click the link or button in the email we sent you.
-        post_verifying: After you validate your email address this screen will change <strong>automatically</strong> and you'll proceed to <strong>%client%</strong>.
-        success: Your email was successfully validated.
-        back_to_client: Back to %client%
-        help:
-            cant_find_email:
-                title: I'm having trouble finding the confirmation email
-                body: If you are having trouble to find the confirmation email, please make sure it isn't in the junk mail section of your email program or site.
-                change_email:
-                    body: If you are certain the email was not received, it's possible that you mistyped your email address. You can change you email address below.
-                    submit:
-                        label: If your email is mistyped, correct it and click the following button.
-                        button: Change Email
+error.400:
+    title: Bad Request
+    body: 'A service you are using sent an invalid request. Please contact the service''s maintainer.'
+    line2: 'If your aren''t using any service, this can be an issue with your browser. We advise you update it to avoid further issues.'
 tasks.fill_email:
     title: Informe um endereço de Email
     body: O serviço usado para criar sua conta, %service%, não nos enviou seu endereço de email. Por favor, digite seu endereço a seguir para continuar.
@@ -509,3 +489,65 @@ profile:
                 no: No
     submit: Save
 scope_details.handle.title: What is this?
+flash_message.close: Close
+city_selector.no_javascript: 'The fields related to your place of birth are unavailable because your browser does not have JavaScript enabled.'
+lc.admin.person.metadata:
+    title: "Metadata"
+    date_format: "m/d/Y H:i:s"
+    createdAt: "Account Creation Date"
+    emailConfirmedAt:
+        label: "Email Confirmation Date"
+        empty: "Email not confirmed"
+    lastLogin: "Last Login"
+    hasCpf:
+        label: "Filled CPF/Taxpayer ID?"
+        yes: "Yes"
+        no: "No"
+    authorization.createdAt: "Authorization Date"
+dashboard:
+    active_services:
+        no_entries: You didn't connect to any service.
+        check_available: Check the services available
+    logs:
+        login.no_entries: No login history yet.
+        activity.no_entries: No activities were registered yet.
+password_hint:
+    and: and
+    requirements:
+        letters: letters
+        numbers: numbers
+        special: special characters
+    range:
+        with_reqs: Password with %min% to %max% %reqs%.
+        no_reqs: Password with %min% to %max% characters.
+    min:
+        with_reqs: Password with at least %min% %reqs%.
+        no_reqs: Password with at least %min% characters.
+    max:
+        with_reqs: Password with at most %max% %reqs%.
+        no_reqs: Password with at most %max% characters.
+    no_limit:
+        with_reqs: Password with %reqs%.
+services:
+    title: Services
+    active_services:
+        title: Active Services
+        details: Service's Details
+        go_to: Go to Service
+    unauthorized:
+        title: Other Services
+        details: Service's Details
+        go_to: Go to Service
+    details:
+        back: Back to services list
+        authorized_scopes: This service uses the following data from your account
+        go_to: Visit this service's page
+        active: This service is already active in your account
+        not_active: This service is not active in your account
+        activate: Activate this service
+        wait_launch: This service is not available yet. Stay tuned for the launch date.
+        deactivate:
+            label: Deactivate this service
+            confirm: Do you really want to disable this service?
+            yes: Yes
+            no: No

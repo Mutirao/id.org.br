@@ -2,6 +2,13 @@
 
 namespace LoginCidadao\CoreBundle\Model;
 
+use Doctrine\ORM\EntityManagerInterface;
+use LoginCidadao\BadgesControlBundle\Model\BadgeInterface;
+use LoginCidadao\CoreBundle\Entity\BackupCode;
+use LoginCidadao\CoreBundle\Tests\LongPolling\LongPollableInterface;
+use Scheb\TwoFactorBundle\Model\Google\TwoFactorInterface;
+use Symfony\Component\HttpFoundation\File\File;
+use Doctrine\Common\Collections\ArrayCollection;
 use FOS\UserBundle\Model\UserInterface;
 use LoginCidadao\CoreBundle\Entity\City;
 use LoginCidadao\CoreBundle\Entity\Country;
@@ -9,9 +16,8 @@ use LoginCidadao\CoreBundle\Entity\State;
 use Symfony\Component\Security\Core\Encoder\EncoderAwareInterface;
 use LoginCidadao\OAuthBundle\Entity\Client;
 use JMS\Serializer\Annotation as JMS;
-use Doctrine\ORM\EntityManager;
 
-interface PersonInterface extends EncoderAwareInterface, UserInterface
+interface PersonInterface extends EncoderAwareInterface, UserInterface, LocationAwareInterface, LongPollableInterface, TwoFactorInterface
 {
     public function getId();
 
@@ -27,6 +33,9 @@ interface PersonInterface extends EncoderAwareInterface, UserInterface
 
     public function setSurname($suname);
 
+    /**
+     * @return \DateTime
+     */
     public function getBirthdate();
 
     public function setBirthdate($birthdate);
@@ -81,10 +90,6 @@ interface PersonInterface extends EncoderAwareInterface, UserInterface
 
     public function getCpf();
 
-    public function setCpfExpiration($cpfExpiration);
-
-    public function getCpfExpiration();
-
     public function setCreatedAt(\DateTime $createdAt);
 
     public function getCreatedAt();
@@ -114,8 +119,6 @@ interface PersonInterface extends EncoderAwareInterface, UserInterface
     public function setPreviousValidEmail($previousValidEmail);
 
     public function getPreviousValidEmail();
-
-    public function isCpfExpired();
 
     public function hasPassword();
 
@@ -193,8 +196,14 @@ interface PersonInterface extends EncoderAwareInterface, UserInterface
 
     public function getComplement();
 
+    /**
+     * @return IdCardInterface[]
+     */
     public function getIdCards();
 
+    /**
+     * @return BadgeInterface[]
+     */
     public function getBadges();
 
     /**
@@ -207,13 +216,6 @@ interface PersonInterface extends EncoderAwareInterface, UserInterface
     public function getGoogleAuthenticatorSecret();
 
     public function setGoogleAuthenticatorSecret($googleAuthenticatorSecret);
-
-    /**
-     * @param EntityManager $em
-     * @param \DateTime $updatedAt
-     * @return PersonInterface
-     */
-    public function waitUpdate(EntityManager $em, \DateTime $updatedAt);
 
     /**
      * @return City
@@ -229,4 +231,25 @@ interface PersonInterface extends EncoderAwareInterface, UserInterface
      * @return Country
      */
     Public function getCountry();
+
+    /**
+     * @param bool $verified
+     * @return $this
+     */
+    public function setPhoneNumberVerified($verified = false);
+
+    /**
+     * @return bool
+     */
+    public function getPhoneNumberVerified();
+
+    /**
+     * @return ArrayCollection
+     */
+    public function getAddresses();
+
+    /**
+     * @return BackupCode[]
+     */
+    public function getBackupCodes();
 }

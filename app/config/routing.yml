@@ -1,3 +1,7 @@
+login_cidadao_dynamic_form:
+    resource: "@LoginCidadaoDynamicFormBundle/Resources/config/routing.yml"
+    prefix:   /
+
 # Monitor
 _monitor:
     resource: "@LiipMonitorBundle/Resources/config/routing.xml"
@@ -70,7 +74,9 @@ google_login:
 lc_api:
     type: rest
     resource: "@LoginCidadaoAPIBundle/Resources/config/routing.yml"
-    prefix:   /api/v1
+    prefix:   /api/v{version}
+    requirements:
+        version: \d+(.\d+)*
 
 # API Doc
 NelmioApiDocBundle:
@@ -87,8 +93,15 @@ lc_core:
     resource: "@LoginCidadaoCoreBundle/Resources/config/routing.yml"
     prefix:   /
 lc_home:
-    defaults: { _controller: FOSUserBundle:Security:login }
-    path:   /
+    path: /
+    defaults:
+        _controller: FrameworkBundle:Redirect:urlRedirect
+        path: /dashboard
+        permanent: false
+
+lc_phone_verification:
+    resource: "@LoginCidadaoPhoneVerificationBundle/Resources/config/routing.yml"
+    prefix:   /
 
 # Audit
 simple_things_entity_audit:

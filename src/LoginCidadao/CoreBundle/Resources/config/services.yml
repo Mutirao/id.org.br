@@ -23,8 +23,6 @@ parameters:
     lc.emailChanged.template: LoginCidadaoCoreBundle:Person:emailChangedMessage.html.twig
     lc.notification.email.template: LoginCidadaoCoreBundle:Email:notification.html.twig
 
-    lc.postalcode.search.form.type.class: LoginCidadao\CoreBundle\Form\Type\SearchPostalCodeFormType
-
     lc.person.serialize.listenner.class: LoginCidadao\CoreBundle\EventListener\PersonSerializeEventListener
 
     lc.idcard.form.class: LoginCidadao\CoreBundle\Form\Type\IdCardType
@@ -55,7 +53,6 @@ services:
             - "@service_container"
             - "@fos_user.registration.form.factory"
             - { facebook: facebookId, twitter: twitterId, google: googleId }
-            - %http_proxy%
 
     lc.person.registration.form.type:
         class: %lc.person.registration.form.type.class%
@@ -67,12 +64,12 @@ services:
 
     lc.person.profile.form.type:
         class: %lc.person.profile.form.type.class%
-        arguments: [%fos_user.model.user.class%]
+        arguments:
+            - "%fos_user.model.user.class%"
+            - "@doctrine.orm.entity_manager"
+            - "%default_country_iso2%"
         tags:
             - { name: form.type, alias: lc_person_profile }
-        calls:
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
-            - [ setDefaultCountryIso2, [%default_country_iso2%] ]
 
     lc.person.revoke_authorization.form.type:
         class: %lc.person.revoke_authorization.form.type.class%
@@ -86,21 +83,19 @@ services:
         tags:
             - { name: form.type, alias: lc_person_resetting }
 
-    lc.postalcode.search.form.type:
-        class: %lc.postalcode.search.form.type.class%
-        arguments: [%fos_user.model.user.class%]
-        tags:
-            - { name: form.type, alias: search_postalcode_form_type }
-        calls:
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
-
     lc.user_provider:
         class: %lc.user_provider.class%
         arguments: ["@fos_user.user_manager"]
 
     lc.user_manager:
         class: %lc.user_manager.class%
-        arguments: ["@security.encoder_factory", "@fos_user.util.username_canonicalizer", "@fos_user.util.email_canonicalizer", "@fos_user.object_manager", %user.class%, "@service_container"]
+        lazy: true
+        arguments:
+            - "@security.encoder_factory"
+            - "@fos_user.util.username_canonicalizer"
+            - "@fos_user.util.email_canonicalizer"
+            - "@doctrine.orm.entity_manager"
+            - "%user.class%"
 
     lc.login.form.type:
         class: LoginCidadao\CoreBundle\Form\Type\LoginFormType
@@ -119,10 +114,11 @@ services:
         class: LoginCidadao\CoreBundle\Security\Http\Firewall\LoginCidadaoListener
         parent: security.authentication.listener.form
         abstract: true
+        arguments:
+            -
+            - "@doctrine.orm.entity_manager"
         calls:
-            - [setContainer, ["@service_container"]]
             - [setFormFactory, ["@form.factory"]]
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
             - [setTranslator, ["@translator"]]
             - [setBruteForceThreshold, [%brute_force_threshold%]]
 
@@ -136,13 +132,14 @@ services:
             - "@fos_user.util.token_generator"
             - "@lc.register_requested_scope"
             - "@lc.client.repository"
+            - "@doctrine.orm.entity_manager"
+            - "@oidc.subject_identifier.service"
             - "%registration.email.unconfirmed_time%"
             - "%lc_supported_scopes%"
             - "%oauth_default_client.uid%"
+            - "%default_country_iso2%"
         tags:
             - { name: kernel.event_subscriber }
-        calls:
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
 
     lc.profile_edit:
         class: %lc.profile_edit.class%
@@ -153,12 +150,11 @@ services:
             - "@router"
             - "@session"
             - "@security.token_storage"
+            - "@doctrine.orm.entity_manager"
             - %registration.email.unconfirmed_time%
         tags:
             - { name: kernel.event_subscriber }
         calls:
-            - [setCpfEmptyTime, ["%registration.cpf.empty_time%"]]
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
             - [setUserManager, ["@fos_user.user_manager"]]
 
     lc.change.password.form.type:
@@ -196,9 +192,6 @@ services:
             - "@router"
             - "@session"
             - "@translator"
-            - "@lc.intent.manager"
-            - "@lc.tasks.manager"
-            - "%default_password_encoder%"
             - "%require_email_validation%"
         tags:
             - { name: kernel.event_listener, event: kernel.request, method: onKernelRequest }
@@ -227,14 +220,6 @@ services:
             - [setTokenStorage, ["@security.token_storage"]]
         tags:
             - { name: form.type, alias: client_base_form_type }
-
-    lc.category.form.type:
-        class: LoginCidadao\CoreBundle\Form\Type\CategoryFormType
-        tags:
-            - { name: form.type, alias: category_form_type }
-        calls:
-            - [setTokenStorage, ["@security.token_storage"]]
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
 
     lc.placeholder.form.type:
         class: LoginCidadao\CoreBundle\Form\Type\PlaceholderFormType
@@ -269,7 +254,6 @@ services:
         tags:
             - { name: form.type, alias: person_resume_form_type }
         calls:
-            - [setEntityManager, ["@doctrine.orm.entity_manager"]]
             - [setTranslator, ["@translator"]]
             - [setTokenStorage, ["@security.token_storage"]]
 
@@ -286,7 +270,7 @@ services:
 
     lc.person.address.form.type:
         class: %lc.person.address.form.type.class%
-        arguments: [ "@translator", "@doctrine.orm.entity_manager" ]
+        arguments: ["@doctrine.orm.entity_manager"]
         tags:
             - { name: form.type, alias: lc_person_address }
 
@@ -332,18 +316,21 @@ services:
 
     lc.country_manager:
         class: LoginCidadao\CoreBundle\Model\Manager\CountryManager
+        lazy: true
         arguments:
             - "@doctrine.orm.entity_manager"
             - LoginCidadao\CoreBundle\Entity\Country
 
     lc.state_manager:
         class: LoginCidadao\CoreBundle\Model\Manager\StateManager
+        lazy: true
         arguments:
             - "@doctrine.orm.entity_manager"
             - LoginCidadao\CoreBundle\Entity\State
 
     lc.city_manager:
         class: LoginCidadao\CoreBundle\Model\Manager\CityManager
+        lazy: true
         arguments:
             - "@doctrine.orm.entity_manager"
             - LoginCidadao\CoreBundle\Entity\City
@@ -388,16 +375,18 @@ services:
 
     lc.register_requested_scope:
         class: LoginCidadao\CoreBundle\Service\RegisterRequestedScope
+        lazy: true
 
     lc.intent.manager:
         class: LoginCidadao\CoreBundle\Service\IntentManager
+        lazy: true
 
     lc.login_entry_point:
         class: LoginCidadao\CoreBundle\EventListener\LoginEntryPoint
         arguments:
             - "@security.http_utils"
+            - "@event_dispatcher"
             - "@lc.register_requested_scope"
-            - "@lc.intent.manager"
 
     lc.invalidate_session_request.repository:
         myrepository:
@@ -411,7 +400,6 @@ services:
         arguments:
             - "@security.token_storage"
             - "@security.authorization_checker"
-            - "@security.http_utils"
             - "@lc.invalidate_session_request.repository"
             - "%require_email_validation%"
             - "%default_password_encoder%"
@@ -428,13 +416,49 @@ services:
         tags:
             - { name: form.type, alias: birthday_tel }
 
-    lc.tasks.manager:
-        class: LoginCidadao\CoreBundle\Service\TasksManager
-        calls:
-          - ["setSession", ["@?session"]]
-
     qandidate.stack.request_id.monolog_processor:
         class: Qandidate\Stack\RequestId\MonologProcessor
         tags:
             - { name: kernel.event_listener, event: kernel.request, method: onKernelRequest, priority: 255 }
             - { name: monolog.processor }
+
+    lc.authentication.hwi_failure_handler:
+        class: LoginCidadao\CoreBundle\Security\HWIAuthenticationFailureHandler
+        arguments:
+            - "@http_kernel"
+            - "@security.http_utils"
+        lazy: true
+
+    lc.request.referer_logger:
+        class: LoginCidadao\CoreBundle\EventListener\RequestListener
+        calls:
+            - [ 'setLogger', ["@logger"] ]
+        tags:
+            - { name: kernel.event_listener, event: kernel.request, method: onKernelRequest }
+            - { name: monolog.logger, channel: request }
+
+    lc.fos.user_manipulator.proxy:
+        class: LoginCidadao\CoreBundle\Helper\UserManipulatorProxy
+        arguments:
+            - "@fos_user.user_manager"
+            - "@event_dispatcher"
+            - "@service_container"
+
+    password_hint:
+        class: LoginCidadao\CoreBundle\Service\PasswordHintService
+        arguments:
+            - "@validator"
+            - "@translator"
+            - "%user.class%"
+        lazy: true
+
+    long_polling:
+        class: LoginCidadao\CoreBundle\LongPolling\LongPollingUtils
+        arguments:
+            - "@doctrine.orm.entity_manager"
+
+    lc.two_factor:
+        class: LoginCidadao\CoreBundle\Security\TwoFactorAuthenticationService
+        arguments:
+            - "@doctrine.orm.entity_manager"
+            - "@scheb_two_factor.security.google_authenticator"

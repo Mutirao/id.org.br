@@ -1,48 +1,54 @@
 <?php
+/**
+ * This file is part of the login-cidadao project or it's bundles.
+ *
+ * (c) Guilherme Donato <guilhermednt on github>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
 namespace LoginCidadao\CoreBundle\Entity;
 
-use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use libphonenumber\PhoneNumber;
+use LoginCidadao\BadgesControlBundle\Model\BadgeInterface;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
-use Scheb\TwoFactorBundle\Model\Google\TwoFactorInterface;
 use Scheb\TwoFactorBundle\Model\BackupCodeInterface;
 use Vich\UploaderBundle\Mapping\Annotation as Vich;
 use JMS\Serializer\Annotation as JMS;
 use FOS\UserBundle\Model\User as BaseUser;
 use LoginCidadao\OAuthBundle\Entity\Client;
-use LoginCidadao\CoreBundle\Model\SelectData;
-use LoginCidadao\LongPolling\LongPollingUtils;
+use LoginCidadao\CoreBundle\Model\LocationSelectData;
 use LoginCidadao\CoreBundle\Model\PersonInterface;
 use LoginCidadao\OAuthBundle\Model\ClientInterface;
-use LoginCidadao\CoreBundle\Model\LocationAwareInterface;
 use LoginCidadao\ValidationBundle\Validator\Constraints as LCAssert;
 use Donato\PathWellBundle\Validator\Constraints\PathWell;
 use Misd\PhoneNumberBundle\Validator\Constraints\PhoneNumber as AssertPhoneNumber;
+use Rollerworks\Bundle\PasswordStrengthBundle\Validator\Constraints as RollerworksPassword;
 
 /**
  * @ORM\Entity(repositoryClass="LoginCidadao\CoreBundle\Entity\PersonRepository")
  * @ORM\Table(name="person")
  * @UniqueEntity("cpf", message="person.validation.cpf.already_used", groups={"LoginCidadaoRegistration", "Registration", "Profile", "LoginCidadaoProfile", "Dynamic", "Documents"})
  * @UniqueEntity("username")
- * @UniqueEntity(fields="email", errorPath="email", message="fos_user.email.already_used", groups={"LoginCidadaoRegistration", "Registration", "LoginCidadaoEmailForm", "LoginCidadaoProfile", "Dynamic"})
+ * @UniqueEntity(fields="emailCanonical", errorPath="email", message="fos_user.email.already_used", groups={"LoginCidadaoRegistration", "Registration", "LoginCidadaoEmailForm", "LoginCidadaoProfile", "Dynamic"})
  * @ORM\HasLifecycleCallbacks
  * @JMS\ExclusionPolicy("all")
  * @Vich\Uploadable
  */
-class Person extends BaseUser implements PersonInterface, TwoFactorInterface, BackupCodeInterface,
-    LocationAwareInterface
+class Person extends BaseUser implements PersonInterface, BackupCodeInterface
 {
     /**
      * @ORM\Id
      * @ORM\Column(type="integer")
      * @ORM\GeneratedValue(strategy="AUTO")
      * @JMS\Since("1.0")
+     * @JMS\Until("2")
      */
     protected $id;
 
@@ -96,6 +102,14 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @PathWell(
      *     groups={"Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration"}
      * )
+     * @RollerworksPassword\PasswordRequirements(
+     *     minLength=false,
+     *     requireLetters=true,
+     *     requireNumbers=true,
+     *     missingLettersMessage="person.validation.password.missingLetters",
+     *     missingNumbersMessage="person.validation.password.missingNumbers",
+     *     groups={"Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration"}
+     * )
      * @Assert\Length(
      *     min=8,
      *     max=72,
@@ -103,6 +117,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      *     minMessage="person.validation.password.length.min",
      *     groups={"Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration"}
      * )
+     * @Assert\NotBlank(message="person.validation.password.not_blank", groups={"Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration"})
      */
     protected $plainPassword;
 
@@ -120,6 +135,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @JMS\Groups({"email"})
      * @JMS\Since("1.0")
      * @Assert\Email(strict=true, groups={"Profile", "LoginCidadaoProfile", "Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration", "LoginCidadaoEmailForm"})
+     * @Assert\NotBlank(message="person.validation.email.not_blank", groups={"Profile", "LoginCidadaoProfile", "Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration", "LoginCidadaoEmailForm"})
      */
     protected $email;
 
@@ -128,14 +144,9 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @JMS\Groups({"birthdate"})
      * @ORM\Column(type="date", nullable=true)
      * @JMS\Since("1.0")
+     * @LCAssert\Age(max="150", groups={"Profile", "LoginCidadaoProfile", "Registration", "ResetPassword", "ChangePassword", "LoginCidadaoRegistration", "LoginCidadaoEmailForm"})
      */
     protected $birthdate;
-
-    /**
-     * @ORM\Column(name="cpf_expiration", type="date", nullable=true)
-     * @JMS\Since("1.0")
-     */
-    protected $cpfExpiration;
 
     /**
      * @ORM\Column(name="email_expiration", type="datetime", nullable=true)
@@ -151,6 +162,10 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @JMS\Since("1.0")
      * @LCAssert\E164PhoneNumber(
      *     maxMessage="person.validation.mobile.length.max",
+     *     groups={"Registration", "LoginCidadaoRegistration", "Dynamic", "Profile", "LoginCidadaoProfile"}
+     * )
+     * @LCAssert\MobilePhoneNumber(
+     *     missing9thDigit="person.validation.mobile.9thDigit",
      *     groups={"Registration", "LoginCidadaoRegistration", "Dynamic", "Profile", "LoginCidadaoProfile"}
      * )
      * @AssertPhoneNumber(
@@ -180,7 +195,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="facebookId", type="string", length=255, nullable=true, unique=true)
-     * @JMS\Since("1.0")
+     * @JMS\Exclude
      */
     protected $facebookId;
 
@@ -188,7 +203,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="facebookUsername", type="string", length=255, nullable=true)
-     * @JMS\Since("1.0")
+     * @JMS\Exclude
      */
     protected $facebookUsername;
 
@@ -196,7 +211,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="facebookAccessToken", type="string", length=255, nullable=true)
-     * @JMS\Since("1.1")
+     * @JMS\Exclude()
      */
     protected $facebookAccessToken;
 
@@ -204,7 +219,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="twitterId", type="string", length=255, nullable=true, unique=true)
-     * @JMS\Since("1.0")
+     * @JMS\Exclude
      */
     protected $twitterId;
 
@@ -212,7 +227,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="twitterUsername", type="string", length=255, nullable=true)
-     * @JMS\Since("1.0")
+     * @JMS\Exclude
      */
     protected $twitterUsername;
 
@@ -220,7 +235,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="twitterAccessToken", type="string", length=255, nullable=true)
-     * @JMS\Since("1.0")
+     * @JMS\Exclude
      */
     protected $twitterAccessToken;
 
@@ -303,6 +318,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @JMS\Expose
      * @JMS\Groups({"public_profile","picture"})
      * @JMS\Since("1.0.2")
+     * @JMS\Until("2")
      */
     protected $profilePictureUrl;
 
@@ -319,7 +335,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="googleId", type="string", length=255, nullable=true, unique=true)
-     * @JMS\Since("1.0.3")
+     * @JMS\Exclude
      */
     protected $googleId;
 
@@ -327,7 +343,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="googleUsername", type="string", length=255, nullable=true)
-     * @JMS\Since("1.0.3")
+     * @JMS\Exclude
      */
     protected $googleUsername;
 
@@ -335,7 +351,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @var string
      *
      * @ORM\Column(name="googleAccessToken", type="string", length=255, nullable=true)
-     * @JMS\Since("1.0.3")
+     * @JMS\Exclude
      */
     protected $googleAccessToken;
 
@@ -350,9 +366,13 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
     /**
      * @JMS\Expose
      * @JMS\Groups({"public_profile"})
-     * @var array
+     * @JMS\Type("array<LoginCidadao\BadgesControlBundle\Model\Badge>")
+     * @JMS\Since("2")
+     * @JMS\Until("3")
+     * @deprecated Use RemoteClaims instead
+     * @var array|BadgeInterface[]
      */
-    protected $badges = array();
+    protected $badges = [];
 
     /**
      * @ORM\OneToMany(targetEntity="LoginCidadao\APIBundle\Entity\LogoutKey", mappedBy="person", cascade={"remove"}, orphanRemoval=true)
@@ -368,6 +388,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
 
     /**
      * @ORM\Column(name="google_authenticator_secret", type="string", nullable=true)
+     * @JMS\Exclude
      */
     protected $googleAuthenticatorSecret;
 
@@ -391,6 +412,15 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @ORM\Column(name="password_encoder_name", type="string", length=255, nullable=true)
      */
     protected $passwordEncoderName;
+
+    /**
+     * @JMS\Expose
+     * @JMS\Groups({"public_profile"})
+     * @JMS\SerializedName("phone_number_verified")
+     * @JMS\Since("1.1")
+     * @var bool
+     */
+    protected $phoneNumberVerified = false;
 
     public function __construct()
     {
@@ -446,6 +476,8 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
     public function setBirthdate($birthdate)
     {
         $this->birthdate = $birthdate;
+
+        return $this;
     }
 
     public function getMobile()
@@ -465,6 +497,8 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
             }
         }
         $this->mobile = $mobile;
+
+        return $this;
     }
 
     public function addAuthorization(Authorization $authorization)
@@ -487,8 +521,17 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
     /**
      * @return Authorization[]
      */
-    public function getAuthorizations()
+    public function getAuthorizations($uidToIgnore = null)
     {
+        if ($uidToIgnore !== null) {
+            return array_filter(
+                $this->authorizations->toArray(),
+                function (Authorization $authorization) use ($uidToIgnore) {
+                    return $authorization->getClient()->getUid() != $uidToIgnore;
+                }
+            );
+        }
+
         return $this->authorizations;
     }
 
@@ -652,6 +695,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @JMS\Groups({"badges", "public_profile"})
      * @JMS\VirtualProperty
      * @JMS\SerializedName("deprecated_badges")
+     * @JMS\Until("2")
      * @return array
      */
     public function getDataValid()
@@ -678,18 +722,6 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
     public function getCpf()
     {
         return $this->cpf;
-    }
-
-    public function setCpfExpiration($cpfExpiration)
-    {
-        $this->cpfExpiration = $cpfExpiration;
-
-        return $this;
-    }
-
-    public function getCpfExpiration()
-    {
-        return $this->cpfExpiration;
     }
 
     /**
@@ -813,12 +845,6 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
     public function getPreviousValidEmail()
     {
         return $this->previousValidEmail;
-    }
-
-    public function isCpfExpired()
-    {
-        return ($this->getCpfExpiration() instanceof \DateTime && $this->getCpfExpiration()
-            <= new \DateTime());
     }
 
     public function hasPassword()
@@ -1070,12 +1096,12 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
 
     public function getBadges()
     {
-        return $this->badges;
+        return /** @scrutinizer ignore-deprecated */ $this->badges;
     }
 
     public function mergeBadges(array $badges)
     {
-        $this->badges = array_merge($this->badges, $badges);
+        /** @scrutinizer ignore-deprecated */ $this->badges = array_merge(/** @scrutinizer ignore-deprecated */ $this->badges, $badges);
 
         return $this;
     }
@@ -1195,64 +1221,22 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
 
     public function getPlaceOfBirth()
     {
-        $location = new SelectData();
+        $location = new LocationSelectData();
         $location->getFromObject($this);
 
         return $location;
     }
 
-    public function setPlaceOfBirth(SelectData $location)
+    public function setPlaceOfBirth(LocationSelectData $location)
     {
         $location->toObject($this);
-    }
-
-    public function waitUpdate(EntityManager $em, \DateTime $updatedAt)
-    {
-        $id = $this->getId();
-        $lastUpdatedAt = null;
-        $callback = $this->getCheckUpdateCallback(
-            $em,
-            $id,
-            $updatedAt,
-            $lastUpdatedAt
-        );
-
-        return LongPollingUtils::runTimeLimited($callback);
-    }
-
-    private function getCheckUpdateCallback(
-        EntityManager $em,
-        $id,
-        $updatedAt,
-        $lastUpdatedAt
-    ) {
-        $people = $em->getRepository('LoginCidadaoCoreBundle:Person');
-
-        return function () use ($id, $people, $em, $updatedAt, $lastUpdatedAt) {
-            $em->clear();
-            $person = $people->find($id);
-            if (!$person->getUpdatedAt()) {
-                return false;
-            }
-
-            if ($person->getUpdatedAt() > $updatedAt) {
-                return $person;
-            }
-
-            if ($lastUpdatedAt === null) {
-                $lastUpdatedAt = $person->getUpdatedAt();
-            } elseif ($person->getUpdatedAt() != $lastUpdatedAt) {
-                return $person;
-            }
-
-            return false;
-        };
     }
 
     /**
      * @JMS\Groups({"public_profile"})
      * @JMS\VirtualProperty
      * @JMS\SerializedName("given_name")
+     * @JMS\Since("1.0")
      */
     public function getGivenName()
     {
@@ -1263,6 +1247,7 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
      * @JMS\Groups({"full_name","name"})
      * @JMS\VirtualProperty
      * @JMS\SerializedName("family_name")
+     * @JMS\Since("1")
      */
     public function getFamilyName()
     {
@@ -1280,13 +1265,22 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
     }
 
     /**
-     * @JMS\Groups({"mobile", "phone_number"})
-     * @JMS\VirtualProperty
-     * @JMS\SerializedName("phone_number_verified")
+     * @param bool $verified
+     * @return $this
+     */
+    public function setPhoneNumberVerified($verified = false)
+    {
+        $this->phoneNumberVerified = $verified;
+
+        return $this;
+    }
+
+    /**
+     * @return bool
      */
     public function getPhoneNumberVerified()
     {
-        return false;
+        return $this->phoneNumberVerified;
     }
 
     public function getPasswordEncoderName()
@@ -1311,6 +1305,15 @@ class Person extends BaseUser implements PersonInterface, TwoFactorInterface, Ba
         }
 
         return $encoder;
+    }
+
+    public function getLongDisplayName()
+    {
+        if ($this->getFullName()) {
+            return $this->getFullName();
+        } else {
+            return $this->getEmail();
+        }
     }
 
     public function getShortDisplayName()

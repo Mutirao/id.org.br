@@ -1,8 +1,16 @@
 <?php
+/**
+ * This file is part of the login-cidadao project or it's bundles.
+ *
+ * (c) Guilherme Donato <guilhermednt on github>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
 namespace LoginCidadao\CoreBundle\EventListener;
 
-use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 use FOS\UserBundle\FOSUserEvents;
 use FOS\UserBundle\Event\FormEvent;
 use FOS\UserBundle\Mailer\MailerInterface;
@@ -17,8 +25,8 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
 use LoginCidadao\CoreBundle\Entity\City;
 use LoginCidadao\CoreBundle\Entity\State;
 use LoginCidadao\CoreBundle\Entity\Person;
-use LoginCidadao\CoreBundle\Model\SelectData;
-use LoginCidadao\CoreBundle\Model\DynamicFormData;
+use LoginCidadao\CoreBundle\Model\LocationSelectData;
+use LoginCidadao\DynamicFormBundle\Model\DynamicFormData;
 use LoginCidadao\CoreBundle\Model\PersonInterface;
 use LoginCidadao\CoreBundle\Mailer\TwigSwiftMailer;
 use LoginCidadao\CoreBundle\Exception\LcValidationException;
@@ -36,27 +44,33 @@ class ProfileEditListener implements EventSubscriberInterface
     /** @var TokenStorageInterface */
     private $tokenStorage;
     private $emailUnconfirmedTime;
-    protected $email;
-    protected $cpf;
-    private $cpfEmptyTime;
+
+    protected $previous = [
+        'email' => null,
+        'cpf' => null,
+    ];
+
+    /** @var EntityManagerInterface */
     protected $em;
-    protected $dne;
     protected $userManager;
 
-    public function __construct(TwigSwiftMailer $mailer,
-                                MailerInterface $fosMailer,
-                                TokenGeneratorInterface $tokenGenerator,
-                                UrlGeneratorInterface $router,
-                                SessionInterface $session,
-                                TokenStorageInterface $tokenStorage,
-                                $emailUnconfirmedTime)
-    {
-        $this->mailer               = $mailer;
-        $this->fosMailer            = $fosMailer;
-        $this->tokenGenerator       = $tokenGenerator;
-        $this->router               = $router;
-        $this->session              = $session;
-        $this->tokenStorage         = $tokenStorage;
+    public function __construct(
+        TwigSwiftMailer $mailer,
+        MailerInterface $fosMailer,
+        TokenGeneratorInterface $tokenGenerator,
+        UrlGeneratorInterface $router,
+        SessionInterface $session,
+        TokenStorageInterface $tokenStorage,
+        EntityManagerInterface $em,
+        $emailUnconfirmedTime
+    ) {
+        $this->mailer = $mailer;
+        $this->fosMailer = $fosMailer;
+        $this->tokenGenerator = $tokenGenerator;
+        $this->router = $router;
+        $this->session = $session;
+        $this->tokenStorage = $tokenStorage;
+        $this->em = $em;
         $this->emailUnconfirmedTime = $emailUnconfirmedTime;
     }
 
@@ -69,17 +83,17 @@ class ProfileEditListener implements EventSubscriberInterface
             FOSUserEvents::PROFILE_EDIT_INITIALIZE => 'onProfileEditInitialize',
             FOSUserEvents::PROFILE_EDIT_SUCCESS => 'onProfileEditSuccess',
             ProfileEditListener::PROFILE_DOC_EDIT_SUCCESS => 'onProfileDocEditSuccess',
-            FormEvents::POST_SUBMIT => 'registerTextualLocation'
+            FormEvents::POST_SUBMIT => 'registerTextualLocation',
         );
     }
 
     public function onProfileEditInitialize(GetResponseUserEvent $event)
     {
         // required, because when Success's event is called, session already contains new email
-        $this->email = $this->tokenStorage->getToken()
+        $this->previous['email'] = $this->tokenStorage->getToken()
             ->getUser()
             ->getEmail();
-        $this->cpf   = $this->tokenStorage->getToken()
+        $this->previous['cpf'] = $this->tokenStorage->getToken()
             ->getUser()
             ->getCpf();
     }
@@ -98,7 +112,9 @@ class ProfileEditListener implements EventSubscriberInterface
             $steppe = ucwords(strtolower(trim($event->getForm()->get('ufsteppe')->getData())));
             if ($steppe) {
                 if ($user->getCountry()) {
-                    $isPreferred = $this->em->getRepository('LoginCidadaoCoreBundle:Country')->isPreferred($user->getCountry());
+                    $isPreferred = $this->em->getRepository('LoginCidadaoCoreBundle:Country')->isPreferred(
+                        $user->getCountry()
+                    );
                     if ($isPreferred) {
                         throw new LcValidationException('restrict.location.creation');
                     }
@@ -106,10 +122,12 @@ class ProfileEditListener implements EventSubscriberInterface
                     throw new LcValidationException('required.field.country');
                 }
                 $repo = $this->em->getRepository('LoginCidadaoCoreBundle:State');
-                $ent  = $repo->findOneBy(array(
-                    'name' => $steppe,
-                    'country' => $user->getCountry()
-                ));
+                $ent = $repo->findOneBy(
+                    array(
+                        'name' => $steppe,
+                        'country' => $user->getCountry(),
+                    )
+                );
                 if (!$ent) {
                     $ent = new State();
                     $ent->setName($steppe);
@@ -123,7 +141,9 @@ class ProfileEditListener implements EventSubscriberInterface
             $steppe = ucwords(strtolower(trim($event->getForm()->get('citysteppe')->getData())));
             if ($steppe) {
                 if ($user->getState()) {
-                    $isPreferred = $this->em->getRepository('LoginCidadaoCoreBundle:Country')->isPreferred($user->getState()->getCountry());
+                    $isPreferred = $this->em->getRepository('LoginCidadaoCoreBundle:Country')->isPreferred(
+                        $user->getState()->getCountry()
+                    );
                     if ($isPreferred) {
                         throw new LcValidationException('restrict.location.creation');
                     }
@@ -131,10 +151,12 @@ class ProfileEditListener implements EventSubscriberInterface
                     throw new LcValidationException('required.field.state');
                 }
                 $repo = $this->em->getRepository('LoginCidadaoCoreBundle:City');
-                $ent  = $repo->findOneBy(array(
-                    'name' => $steppe,
-                    'state' => $user->getState()
-                ));
+                $ent = $repo->findOneBy(
+                    array(
+                        'name' => $steppe,
+                        'state' => $user->getState(),
+                    )
+                );
                 if (!$ent) {
                     $ent = new City();
                     $ent->setName($steppe);
@@ -158,16 +180,6 @@ class ProfileEditListener implements EventSubscriberInterface
         $this->checkCPFChanged($user);
     }
 
-    public function setCpfEmptyTime($var)
-    {
-        $this->cpfEmptyTime = $var;
-    }
-
-    public function setEntityManager(EntityManager $var)
-    {
-        $this->em = $var;
-    }
-
     public function setUserManager($var)
     {
         $this->userManager = $var;
@@ -175,9 +187,9 @@ class ProfileEditListener implements EventSubscriberInterface
 
     private function checkEmailChanged(Person & $user)
     {
-        if ($user->getEmail() !== $this->email) {
+        if ($user->getEmail() !== $this->previous['email']) {
             if (is_null($user->getConfirmationToken())) {
-                $user->setPreviousValidEmail($this->email);
+                $user->setPreviousValidEmail($this->previous['email']);
             }
 
             // send confirmation token to new email
@@ -186,19 +198,14 @@ class ProfileEditListener implements EventSubscriberInterface
             $user->setEmailConfirmedAt(null);
             $this->fosMailer->sendConfirmationEmailMessage($user);
 
-            $this->mailer->sendEmailChangedMessage($user, $this->email);
+            $this->mailer->sendEmailChangedMessage($user, $this->previous['email']);
         }
     }
 
     private function checkCPFChanged(Person & $user)
     {
-        if ($user->getCpf() !== $this->cpf) {
-            if ($user->getCpf()) {
-                $user->setCpfExpiration(null);
-            } else {
-                $cpfExpiryDate = new \DateTime($this->cpfEmptyTime);
-                $user->setCpfExpiration($cpfExpiryDate);
-            }
+        if ($user->getCpf() !== $this->previous['cpf']) {
+            // CPF changed
         }
     }
 
@@ -211,13 +218,13 @@ class ProfileEditListener implements EventSubscriberInterface
     private function registerTextualState(\Symfony\Component\Form\FormEvent $event)
     {
         $data = $event->getForm()->getData();
-        if (!($data instanceof SelectData)) {
+        if (!($data instanceof LocationSelectData)) {
             return;
         }
         $form = $event->getForm();
         if ($form->has('state_text')) {
             $stateTextInput = $form->get('state_text')->getData();
-            $stateText      = ucwords(strtolower(trim($stateTextInput)));
+            $stateText = ucwords(strtolower(trim($stateTextInput)));
             if (!$stateText) {
                 return;
             }
@@ -229,11 +236,13 @@ class ProfileEditListener implements EventSubscriberInterface
                 throw new LcValidationException('restrict.location.creation');
             }
 
-            $repo  = $this->em->getRepository('LoginCidadaoCoreBundle:State');
-            $state = $repo->findOneBy(array(
-                'name' => $stateText,
-                'country' => $data->getCountry()
-            ));
+            $repo = $this->em->getRepository('LoginCidadaoCoreBundle:State');
+            $state = $repo->findOneBy(
+                array(
+                    'name' => $stateText,
+                    'country' => $data->getCountry(),
+                )
+            );
             if (!$state) {
                 $state = new State();
                 $state->setName($stateText);
@@ -249,13 +258,13 @@ class ProfileEditListener implements EventSubscriberInterface
     private function registerTextualCity(\Symfony\Component\Form\FormEvent $event)
     {
         $data = $event->getForm()->getData();
-        if (!($data instanceof SelectData)) {
+        if (!($data instanceof LocationSelectData)) {
             return;
         }
         $form = $event->getForm();
         if ($form->has('city_text')) {
             $cityTextInput = $form->get('city_text')->getData();
-            $cityText      = ucwords(strtolower(trim($cityTextInput)));
+            $cityText = ucwords(strtolower(trim($cityTextInput)));
             if (!$cityText) {
                 return;
             }
@@ -268,10 +277,12 @@ class ProfileEditListener implements EventSubscriberInterface
             }
 
             $repo = $this->em->getRepository('LoginCidadaoCoreBundle:City');
-            $city = $repo->findOneBy(array(
-                'name' => $cityText,
-                'state' => $data->getState()
-            ));
+            $city = $repo->findOneBy(
+                array(
+                    'name' => $cityText,
+                    'state' => $data->getState(),
+                )
+            );
             if (!$city) {
                 $city = new City();
                 $city->setName($cityText);

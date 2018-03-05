@@ -11,11 +11,23 @@ person.validation:
     name.length:
         min: This name is too short.
         max: This name is too long.
-    email.length:
-        max: This email is too long.
-    password.length:
-        min: The password must have at least {{ limit }} characters
-        max: The password must have at most {{ limit }} characters
-    cpf.already_used: This CPF is already in use.
-    mobile.length:
-        max: This phone number is too long. The limit is 15 numbers including country and area codes.
+    age:
+        future: It seems that you are not born yet. Check your date of birth.
+        min: You have to be older than {{ limit }} years to register.
+        max: Invalid date of birth.
+    email:
+        length:
+            max: This email is too long.
+        not_blank: Type an email address.
+    password:
+        length:
+            min: The password must have at least {{ limit }} characters
+            max: The password must have at most {{ limit }} characters
+        missingNumbers: Your password must include at least one number.
+        missingLetters: Your password must include at least one letter.
+        not_blank: Please type a password.
+    cpf.already_used: This CPF is already in use by another account.
+    mobile:
+        9thDigit: Brazilian cellphones need the 9th digit
+        length:
+            max: This phone number is too long. The limit is 15 numbers including country and area codes.

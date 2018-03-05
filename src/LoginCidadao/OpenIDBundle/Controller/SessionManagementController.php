@@ -1,5 +1,5 @@
 <?php
-/*
+/**
  * This file is part of the login-cidadao project or it's bundles.
  *
  * (c) Guilherme Donato <guilhermednt on github>
@@ -13,12 +13,13 @@ namespace LoginCidadao\OpenIDBundle\Controller;
 use LoginCidadao\CoreBundle\Helper\SecurityHelper;
 use LoginCidadao\CoreBundle\Model\PersonInterface;
 use LoginCidadao\OAuthBundle\Model\ClientInterface;
+use LoginCidadao\OpenIDBundle\Entity\ClientMetadata;
 use LoginCidadao\OpenIDBundle\Entity\ClientMetadataRepository;
+use LoginCidadao\OpenIDBundle\Exception\IdTokenSubMismatchException;
 use LoginCidadao\OpenIDBundle\Exception\IdTokenValidationException;
 use LoginCidadao\OpenIDBundle\Form\EndSessionForm;
 use LoginCidadao\OpenIDBundle\Service\SubjectIdentifierService;
 use LoginCidadao\OpenIDBundle\Storage\PublicKey;
-use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -26,6 +27,7 @@ use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
  * @Route("/openid/connect")
@@ -107,7 +109,11 @@ class SessionManagementController extends Controller
             $idToken = $request->get('id_token_hint');
             $postLogoutUri = $request->get('post_logout_redirect_uri', null);
             $loggedOut = !$this->isGranted('IS_AUTHENTICATED_REMEMBERED');
-            $getLogoutConsent = $this->shouldGetLogoutConsent($idToken, $loggedOut);
+            try {
+                $getLogoutConsent = $this->shouldGetLogoutConsent($idToken, $loggedOut);
+            } catch (IdTokenSubMismatchException $e) {
+                $getLogoutConsent = true;
+            }
 
             list($postLogoutUri, $postLogoutHost) = $this->getPostLogoutInfo($request, $postLogoutUri, $idToken);
         } catch (IdTokenValidationException $e) {
@@ -171,7 +177,7 @@ class SessionManagementController extends Controller
 
     /**
      * @param string $clientId
-     * @return \LoginCidadao\OAuthBundle\Entity\Client
+     * @return \LoginCidadao\OAuthBundle\Entity\Client|object
      */
     private function getClient($clientId)
     {
@@ -201,6 +207,7 @@ class SessionManagementController extends Controller
     /**
      * @param mixed $idToken a JWT ID Token as a \JOSE_JWT object or string
      * @return bool true if $idToken is valid, false otherwise
+     * @throws IdTokenSubMismatchException
      * @throws IdTokenValidationException
      */
     private function checkIdToken($idToken)
@@ -213,10 +220,12 @@ class SessionManagementController extends Controller
             @$idToken->verify($publicKeyStorage->getPublicKey($idToken->claims['aud']));
 
             if (false === $this->checkIdTokenSub($this->getUser(), $idToken)) {
-                throw new IdTokenValidationException('Invalid subject identifier', Response::HTTP_BAD_REQUEST);
+                throw new IdTokenSubMismatchException('Invalid subject identifier', Response::HTTP_BAD_REQUEST);
             }
 
             return true;
+        } catch (IdTokenSubMismatchException $e) {
+            throw $e;
         } catch (\JOSE_Exception_VerificationFailed $e) {
             throw new IdTokenValidationException($e->getMessage(), Response::HTTP_BAD_REQUEST, $e);
         } catch (\Exception $e) {
@@ -229,8 +238,13 @@ class SessionManagementController extends Controller
      * @param mixed $idToken
      * @return bool
      */
-    private function checkIdTokenSub(PersonInterface $person, $idToken)
+    private function checkIdTokenSub(PersonInterface $person = null, $idToken)
     {
+        if (null === $person) {
+            // User is logged out
+            return true;
+        }
+
         if (!($person instanceof PersonInterface)) {
             return false;
         }
@@ -239,7 +253,7 @@ class SessionManagementController extends Controller
 
         $sub = $this->getSubjectIdentifier($person, $client);
 
-        return $idToken->claims['sub'] === $sub;
+        return $idToken->claims['sub'] == $sub;
     }
 
     /**
@@ -250,7 +264,11 @@ class SessionManagementController extends Controller
     private function getIdToken($idToken)
     {
         if (!($idToken instanceof \JOSE_JWT)) {
-            $idToken = \JOSE_JWT::decode($idToken);
+            try {
+                $idToken = \JOSE_JWT::decode($idToken);
+            } catch (\JOSE_Exception_InvalidFormat $e) {
+                throw new BadRequestHttpException($e->getMessage(), $e);
+            }
         }
 
         return $idToken;
@@ -262,7 +280,9 @@ class SessionManagementController extends Controller
             return false;
         }
 
-        if ($idToken === null) {
+        $postLogoutUri = ClientMetadata::canonicalizeUri($postLogoutUri);
+
+        if (!$idToken) {
             return count($this->findClientByPostLogoutRedirectUri($postLogoutUri)) > 0;
         }
 
@@ -308,7 +328,7 @@ class SessionManagementController extends Controller
 
     /**
      * @param string|\JOSE_JWT $idToken
-     * @return \LoginCidadao\OAuthBundle\Entity\Client
+     * @return \LoginCidadao\OAuthBundle\Entity\Client|false
      */
     private function getIdTokenClient($idToken)
     {
@@ -327,7 +347,10 @@ class SessionManagementController extends Controller
      */
     private function getSecurityHelper()
     {
-        return $this->get('lc.security.helper');
+        /** @var SecurityHelper $securityHelper */
+        $securityHelper = $this->get('lc.security.helper');
+
+        return $securityHelper;
     }
 
     private function getSubjectIdentifier(PersonInterface $person, ClientInterface $client)

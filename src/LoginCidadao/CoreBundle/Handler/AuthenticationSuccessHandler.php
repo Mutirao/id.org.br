@@ -1,4 +1,12 @@
 <?php
+/**
+ * This file is part of the login-cidadao project or it's bundles.
+ *
+ * (c) Guilherme Donato <guilhermednt on github>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
 namespace LoginCidadao\CoreBundle\Handler;
 
@@ -53,15 +61,6 @@ class AuthenticationSuccessHandler extends DefaultAuthenticationSuccessHandler
             $accessSession->setVal(0);
             $this->em->persist($accessSession);
             $this->em->flush();
-        }
-
-        // CPF check
-        if ($token->getUser()->isCpfExpired()) {
-            return $this->httpUtils->createRedirectResponse($request, 'lc_registration_cpf');
-        }
-
-        if (strstr($token->getUser()->getUsername(), '@') !== false) {
-            return $this->httpUtils->createRedirectResponse($request, 'lc_update_username');
         }
 
         return parent::onAuthenticationSuccess($request, $token);

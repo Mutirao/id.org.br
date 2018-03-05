@@ -24,6 +24,7 @@ parameters:
         issuer: %jwt_iss%
         allow_implicit: true
         enforce_state: false
+        always_issue_new_refresh_token: true
 
 services:
     oauth2.storage.user_claims:
@@ -47,28 +48,29 @@ services:
         arguments:
             - "@lc_accesstoken_manager"
             - "@oidc.subject_identifier.service"
+            - "@lc.api.version"
         tags:
             - { name: jms_serializer.event_listener, event: serializer.post_serialize, method: onPostSerialize }
 
     oauth2.response_types.token:
-        class: OAuth2\ResponseType\AccessToken
+        class: LoginCidadao\OpenIDBundle\ResponseType\AccessToken
         arguments:
             - "@oauth2.storage.access_token"
             - "@oauth2.storage.refresh_token"
-            - %oauth2.server.config%
+            - "%oauth2.server.config%"
 
     oauth2.response_types.code:
         class: OAuth2\OpenID\ResponseType\AuthorizationCode
         arguments:
             - "@oauth2.storage.authorization_code"
-            - %oauth2.server.config%
+            - "%oauth2.server.config%"
 
     oauth2.response_types.id_token:
         class: %oauth2.response_types.id_token.class%
         arguments:
             - "@oauth2.storage.user_claims"
             - "@oauth2.storage.public_key"
-            - %oauth2.server.config%
+            - "%oauth2.server.config%"
 
     oauth2.response_types.id_token_token:
         class: OAuth2\OpenID\ResponseType\IdTokenToken
@@ -82,6 +84,12 @@ services:
             - "@oauth2.response_types.code"
             - "@oauth2.response_types.id_token"
 
+    oauth2.grant_type.refresh_token:
+        class: "%oauth2.grant_type.refresh_token.class%"
+        arguments:
+            - "@oauth2.storage.refresh_token"
+            - "%oauth2.server.config%"
+
     organization.repository:
         class: Doctrine\ORM\EntityRepository
         factory: ["@doctrine.orm.entity_manager", getRepository]
@@ -92,9 +100,11 @@ services:
         arguments:
             - "@doctrine.orm.entity_manager"
         class: %checker.sector_identifier_uri.class%
+        lazy: true
 
     validator.sector_identifier_uri:
         class: %validator.sector_identifier_uri.class%
+        lazy: true
         arguments:
             - "@organization.repository"
             - "@checker.sector_identifier_uri"
@@ -112,6 +122,7 @@ services:
 
     lc.client_manager:
         class: LoginCidadao\OpenIDBundle\Manager\ClientManager
+        lazy: true
         arguments:
             - "@doctrine.orm.entity_manager"
             - "@event_dispatcher"
@@ -120,6 +131,7 @@ services:
     oidc.subject_identifier.service:
         class: LoginCidadao\OpenIDBundle\Service\SubjectIdentifierService
         arguments:
+            - "@oidc.subject_identifier.repository"
             - %secret%
 
     oidc.client_metadata.repository:
@@ -127,6 +139,12 @@ services:
         factory: ["@doctrine.orm.entity_manager", getRepository]
         arguments:
             - LoginCidadao\OpenIDBundle\Entity\ClientMetadata
+
+    oidc.subject_identifier.repository:
+        class: Doctrine\ORM\EntityRepository
+        factory: ["@doctrine.orm.entity_manager", getRepository]
+        arguments:
+            - LoginCidadao\OpenIDBundle\Entity\SubjectIdentifier
 
     lc.oidc.tasks.subscriber:
         class: LoginCidadao\OpenIDBundle\EventListener\TaskSubscriber

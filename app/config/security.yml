@@ -29,6 +29,7 @@ security:
             - ROLE_EDIT_CLIENT_ALLOWED_RESTRICTED_SCOPES
             - ROLE_ORGANIZATIONS_DELETE
             - ROLE_SKIP_TOS_AGREEMENT
+            - ROLE_PERSON_EDIT
         ROLE_SUPER_ADMIN:
             - ROLE_ADMIN
             - ROLE_ALLOWED_TO_SWITCH
@@ -40,16 +41,21 @@ security:
             - ROLE_ORGANIZATIONS_DELETE_ANY_ORG
             - ROLE_IMPERSONATION_REPORTS_EDIT
             - ROLE_IMPERSONATION_REPORTS_LIST_ALL
+            - ROLE_VIEW_USERS_CPF
+            - ROLE_AUDIT_PROFILE_VIEWS
 
         ROLE_ALLOWED_TO_SWITCH: FEATURE_IMPERSONATION_REPORTS
         ROLE_EDIT_CLIENT_ALLOWED_RESTRICTED_SCOPES: ROLE_EDIT_CLIENT_ALLOWED_SCOPES
-        FEATURE_ALPHA:  FEATURE_BETA
-        FEATURE_BETA:   FEATURE_PROD, FEATURE_INVALIDATE_SESSIONS, FEATURE_ORGANIZATIONS
-        FEATURE_PROD:   FEATURE_2FACTOR_AUTH
+        ROLE_VIEW_USERS_CPF:
+        ROLE_AUDIT_PROFILE_VIEWS: FEATURE_SHOW_PROFILE_VIEWS
+        FEATURE_ALPHA:  FEATURE_BETA, FEATURE_SHOW_PROFILE_VIEWS
+        FEATURE_BETA:   FEATURE_PROD, FEATURE_ORGANIZATIONS
+        FEATURE_PROD:   FEATURE_2FACTOR_AUTH, FEATURE_INVALIDATE_SESSIONS
         FEATURE_IGP_VALIDATION:
         FEATURE_ORGANIZATIONS:
         FEATURE_IMPERSONATION_REPORTS:
         FEATURE_EDIT_USERNAME:
+        FEATURE_SHOW_PROFILE_VIEWS:
 
     providers:
         chainprovider:
@@ -73,6 +79,8 @@ security:
             context: context_key
             pattern: ^/(?!api|!oauth)
             switch_user: true
+            # If you wish to replace this service ensure that
+            # the new one dispatches the AUTHENTICATION_ENTRY_POINT_START event
             entry_point: lc.login_entry_point
 
             remember_me:
@@ -92,6 +100,7 @@ security:
                 failure_path: /login
                 default_target_path: lc_dashboard
                 success_handler: security.authentication.success_handler
+                failure_handler: lc.authentication.hwi_failure_handler
                 oauth_user_provider:
                     service:  lc.hwi_twitter.user_provider
 
@@ -126,9 +135,8 @@ security:
                 use_referer:                    true
             anonymous: false
 
-
         api:
-          pattern:    ^/api/v1(?!/public)
+          pattern:    ^/api/v\d+(.\d+)*(?!/public)
           fos_oauth:  true
           stateless:  true
           anonymous:  true
@@ -140,8 +148,8 @@ security:
         - { path: ^/_error, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
 
         - { path: ^/api/v1/address/(cities|states|countries)/search, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
-        - { path: ^/api/v1/address/cities/prefetch, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
         - { path: ^/api/v1/public/lc_consultaCep2, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
+        - { path: ^/api/v1/statistics, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
         - { path: ^/api, roles: [ IS_AUTHENTICATED_FULLY ], requires_channel: https }
 
         - { path: ^/oauth$, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
@@ -150,6 +158,10 @@ security:
         - { path: ^/openid/connect/authorize, role: IS_AUTHENTICATED_REMEMBERED, requires_channel: https }
         - { path: ^/login$, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
         - { path: ^/resetting, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
+
+        # Phone Verification
+        - { path: ^/v/, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
+        - { path: ^/phone-verification/success$, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
 
         - { path: ^/connect/facebook$, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }
         - { path: ^/connect/twitter$, role: IS_AUTHENTICATED_ANONYMOUSLY, requires_channel: https }

@@ -26,7 +26,6 @@ class AppKernel extends Kernel
 
             new SimpleThings\EntityAudit\SimpleThingsEntityAuditBundle(),
             new HWI\Bundle\OAuthBundle\HWIOAuthBundle(),
-            new Donato\Generic\HWIOAuthProxyBundle\DonatoGenericHWIOAuthProxyBundle(),
 
             new LoginCidadao\LocaleBundle\LoginCidadaoLocaleBundle(),
             new LoginCidadao\APIBundle\LoginCidadaoAPIBundle(),
@@ -59,6 +58,11 @@ class AppKernel extends Kernel
 
             new Donato\PathWellBundle\DonatoPathWellBundle(),
             new Misd\PhoneNumberBundle\MisdPhoneNumberBundle(),
+            new Rollerworks\Bundle\PasswordStrengthBundle\RollerworksPasswordStrengthBundle(),
+            new LoginCidadao\PhoneVerificationBundle\LoginCidadaoPhoneVerificationBundle(),
+            new LoginCidadao\TaskStackBundle\LoginCidadaoTaskStackBundle(),
+            new LoginCidadao\DynamicFormBundle\LoginCidadaoDynamicFormBundle(),
+            new LoginCidadao\LogBundle\LoginCidadaoLogBundle(),
         );
 
         if (in_array($this->getEnvironment(), array('dev', 'test'))) {

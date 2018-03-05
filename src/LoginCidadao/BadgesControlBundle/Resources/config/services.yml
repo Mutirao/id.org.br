@@ -6,6 +6,7 @@ parameters:
 services:
     badges.handler:
         class: %badges.handler.class%
+        lazy: true
         arguments: [ "@event_dispatcher" ]
 
     lc.badges_control.subscriber:
@@ -16,6 +17,9 @@ services:
 
     lc_badges_control.serializer.subscriber:
         class: %lc_badges_control.serializer.subscriber.class%
-        arguments: [ "@badges.handler" ]
+        arguments:
+            - "@badges.handler"
+            - "@lc.api.version"
         tags:
             - { name: jms_serializer.event_listener, event: serializer.pre_serialize, method: onPreSerialize }
+            - { name: jms_serializer.event_listener, event: serializer.post_serialize, method: onPostSerialize }
